@@ -1,0 +1,7 @@
+*__pycache__*
+*run.sh*
+*users.conf*
+*win98.qcow2*
+*vm.json*
+iso/
+floppy/
