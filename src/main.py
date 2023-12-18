@@ -14,7 +14,7 @@ R9XD_VERSION=0.1
 CONF = {
     "host": "0.0.0.0",
     "port": 8080,
-    "qemu-bin": "../../qemu-3dfx-fork/build/qemu-system-i386",
+    "qemu-bin": "qemu-system-i386",
     "qmp-socket": "/tmp/qmpsock"
 }
 VMM = VMManager(CONF['qemu-bin'], CONF['qmp-socket'])
