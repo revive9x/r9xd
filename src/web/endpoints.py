@@ -236,10 +236,10 @@ class r9x_web_providers():
     
         user.authkeys[authkey].refresh()
 
-        if(main.VMM.setiso(post_data["floppy"])):
+        if(main.VMM.setfloppy(post_data["floppy"])):
             httphandler.send_web_response(webserver.webstatus.SUCCESS, "Floppy set.")
         else:
-            httphandler.send_web_response(webserver.webstatus.SUCCESS, "QMP connection is not ready!")
+            httphandler.send_web_response(webserver.webstatus.SUCCESS, "Could not set floppy.")
 
 
 
