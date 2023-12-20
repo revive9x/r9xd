@@ -30,6 +30,7 @@ def main():
     endpoints.r9x_web_providers.setup_usermgr("users.conf")
     webserver.WEB_CONFIG["logger_function_debug"] = log.debug
     webserver.WEB_CONFIG["logger_function_info"] = log.web_log
+    webserver.WEB_CONFIG["send_cors_headers"] = True
 
     webserver.web_server.register_get_endpoints(
         endpoints.r9x_web_providers.get_get_providers())
