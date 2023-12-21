@@ -15,7 +15,8 @@ class VMManager():
         self.qemu_bin = qemu_bin
         self.qmp_socket_path = qmp_socket_path
         self.qemu_process = None
-        self.qmp = None 
+        self.qmp = None
+        self.cdrom_mode = "SCSI" # default
 
         if(os.path.exists("vm.json")):
             self.setup_mode = False
@@ -40,7 +41,7 @@ class VMManager():
         # fetch this:
         # https://github.com/JHRobotics/patcher9x/releases/download/v0.8.50/patcher9x-0.8.50-boot.ima
 
-        os.system(f"qemu-img create -f qcow2 win98.qcow2 {disk_size_mb}")
+        os.system(f"qemu-img create -f qcow2 win98.qcow2 {disk_size_mb}M")
         
         # Write VM Config
         self.conf = {
@@ -82,16 +83,39 @@ class VMManager():
             return False
 
         log.info(f"Launching QEMU ({self.qemu_bin})..")
-        self.qemu_process = subprocess.Popen(
-                [self.qemu_bin,
-                    "--enable-kvm",
-                    "-qmp", f"unix:{self.qmp_socket_path},server,nowait", # QMP Unix socket
-                    "-full-screen",
-                    "-device", "VGA", "-device", "lsi", "-device", "ac97",
-                    "-netdev", "user,id=net0", "-device", "pcnet,rombar=0,netdev=net0"
-
-                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
+        # SCSI CD mode
+        if(self.cdrom_mode == "SCSI"):
+            log.info("Starting in SCSI CDRom mode.")
+            self.qemu_process = subprocess.Popen(
+                    [self.qemu_bin,
+                        "-nodefaults", "-rtc", "base=localtime", "-display", "sdl",
+                        "-boot", "menu=on",
+                        "-M", "pc,accel=kvm,hpet=off,usb=off", "-cpu", "host",
+                        "-qmp", f"unix:{self.qmp_socket_path},server,nowait", # QMP Unix socket
+                        "-full-screen",
+                        "-device", "VGA", "-device", "lsi", "-device", "ac97",
+                        "-netdev", "user,id=net0", "-device", "pcnet,rombar=0,netdev=net0",
+                        "-drive", "id=win98,if=none,file=win98.qcow2", "-device", "scsi-hd,drive=win98",
+                        "-drive", "id=iso,if=none,media=cdrom", "-device", "scsi-cd,drive=iso",
+                     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # IDE CD mode
+        else:
+            log.info("Starting in IDE CDRom mode.")
+            self.qemu_process = subprocess.Popen(
+                    [self.qemu_bin,
+                        "-nodefaults", "-rtc", "base=localtime", "-display", "sdl",
+                        "-boot", "menu=on",
+                        "-M", "pc,accel=kvm,hpet=off,usb=off", "-cpu", "host",
+                        "-qmp", f"unix:{self.qmp_socket_path},server,nowait", # QMP Unix socket
+                        "-full-screen",
+                        "-device", "VGA", "-device", "lsi", "-device", "ac97",
+                        "-netdev", "user,id=net0", "-device", "pcnet,rombar=0,netdev=net0",
+                        "-drive", "id=win98,if=none,file=win98.qcow2", "-device", "scsi-hd,drive=win98",
+                        "-drive", "id=iso,if=none,media=cdrom", "-device", "ide-cd,drive=iso",
+                     ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         not_ready = True
         while not_ready:
             if(os.path.exists(self.qmp_socket_path)):
@@ -139,14 +163,29 @@ class VMManager():
 
         if(not filename in os.listdir("iso/")):
             return False
-
+        
         q.send_qmp_message({
             "execute": "blockdev-change-medium",
             "arguments": {
-                    "device": "ide1-cd0",
+                    "device": "iso",
                     "filename": f"iso/{filename}"
                 }
         })
+        return True
+
+    def ejectiso(self) -> bool:
+        """
+        Eject ISO image from CD drive
+        """
+        q = self.get_qmp()
+        if(q is None):
+            return False
+
+        q.send_qmp_message({
+                "execute": "eject",
+                "device": "cdrom",
+                "force": "true"
+            })
         return True
 
     def setfloppy(self, filename) -> bool:
@@ -168,8 +207,23 @@ class VMManager():
                 }
         })
         return True
+
+    def ejectfloppy(self) -> bool:
+        """
+        Eject floppy image from floppy drive
+        """
+        q = self.get_qmp()
+        if(q is None):
+            return False
+
+        q.send_qmp_message({
+                "execute": "eject",
+                "device": "floppy0",
+                "force": "true"
+            })
+        return True
     
-    def queryblock(self) -> bool:
+    def queryblock(self):
         """
         Query block devices
         """

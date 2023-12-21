@@ -23,9 +23,13 @@ class r9x_web_providers():
             "vminfo": r9x_web_providers.vminfo_endpoint,
             "start": r9x_web_providers.start_endpoint,
             "reset": r9x_web_providers.reset_endpoint,
+            "kill": r9x_web_providers.kill_endpoint,
             "setiso": r9x_web_providers.setiso_endpoint,
+            "ejectiso": r9x_web_providers.ejectiso_endpoint,
             "setfloppy": r9x_web_providers.setfloppy_endpoint,
-            "files": r9x_web_providers.file_endpoint
+            "ejectfloppy": r9x_web_providers.ejectfloppy_endpoint,
+            "files": r9x_web_providers.file_endpoint,
+            "setcdmode": r9x_web_providers.set_cdrommode_endpoint,
         }
 
     @staticmethod
@@ -162,7 +166,27 @@ class r9x_web_providers():
         if(main.VMM.start()):
             httphandler.send_web_response(webserver.webstatus.SUCCESS, "VirtualMachine started.")
         else:
-            httphandler.send_web_response(webserver.webstatus.SUCCESS, "VM is already running.")
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "VM is already running.")
+
+
+    # endpoint /kill (post)
+    @staticmethod
+    def kill_endpoint(httphandler, form_data, post_data):
+        if("authkey" not in post_data):
+            log.debug("Missing request data for authentication: authkey")
+            httphandler.send_web_response(webserver.webstatus.MISSING_DATA, "Missing request data for authentication: Authentication key (authkey)")
+            return
+
+        authkey = post_data["authkey"]
+
+        user = r9x_web_providers.usermgr.get_key_owner(authkey)
+        if (user is None):
+            httphandler.send_web_response(webserver.webstatus.AUTH_FAILURE, "Invalid authentication key.")
+            return
+    
+        user.authkeys[authkey].refresh()
+        main.VMM.kill()
+        httphandler.send_web_response(webserver.webstatus.SUCCESS, "Killing VirtualMachine.")
 
 
     # endpoint /reset (post)
@@ -184,7 +208,7 @@ class r9x_web_providers():
         if(main.VMM.reset()):
             httphandler.send_web_response(webserver.webstatus.SUCCESS, "Resetting VirtualMachine.")
         else:
-            httphandler.send_web_response(webserver.webstatus.SUCCESS, "QMP connection is not ready!")
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "QMP connection is not ready!")
 
 
     # endpoint /setiso (post)
@@ -211,8 +235,30 @@ class r9x_web_providers():
         if(main.VMM.setiso(post_data["iso"])):
             httphandler.send_web_response(webserver.webstatus.SUCCESS, "ISO set.")
         else:
-            httphandler.send_web_response(webserver.webstatus.SUCCESS, "Could not set ISO")
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "Could not set ISO")
 
+
+    # endpoint /ejectiso (post)
+    @staticmethod
+    def ejectiso_endpoint(httphandler, form_data, post_data):
+        if("authkey" not in post_data):
+            log.debug("Missing request data for authentication: authkey")
+            httphandler.send_web_response(webserver.webstatus.MISSING_DATA, "Missing request data for authentication: Authentication key (authkey)")
+            return
+
+        authkey = post_data["authkey"]
+
+        user = r9x_web_providers.usermgr.get_key_owner(authkey)
+        if (user is None):
+            httphandler.send_web_response(webserver.webstatus.AUTH_FAILURE, "Invalid authentication key.")
+            return
+    
+        user.authkeys[authkey].refresh()
+
+        if(main.VMM.ejectiso()):
+            httphandler.send_web_response(webserver.webstatus.SUCCESS, "ISO image ejected.")
+        else:
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "Could not eject ISO image.")
 
 
     # endpoint /setfloppy (post)
@@ -242,6 +288,28 @@ class r9x_web_providers():
             httphandler.send_web_response(webserver.webstatus.SUCCESS, "Could not set floppy.")
 
 
+    # endpoint /ejectfloppy (post)
+    @staticmethod
+    def ejectfloppy_endpoint(httphandler, form_data, post_data):
+        if("authkey" not in post_data):
+            log.debug("Missing request data for authentication: authkey")
+            httphandler.send_web_response(webserver.webstatus.MISSING_DATA, "Missing request data for authentication: Authentication key (authkey)")
+            return
+
+        authkey = post_data["authkey"]
+
+        user = r9x_web_providers.usermgr.get_key_owner(authkey)
+        if (user is None):
+            httphandler.send_web_response(webserver.webstatus.AUTH_FAILURE, "Invalid authentication key.")
+            return
+    
+        user.authkeys[authkey].refresh()
+
+        if(main.VMM.ejectiso()):
+            httphandler.send_web_response(webserver.webstatus.SUCCESS, "Floppy image ejected.")
+        else:
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "Could not eject Floppy image.")
+
 
     # endpoint /files (post)
     @staticmethod
@@ -264,3 +332,36 @@ class r9x_web_providers():
                 "isos": os.listdir("iso/"),
                 "floppy": os.listdir("floppy/")
             })
+
+    @staticmethod
+    def set_cdrommode_endpoint(httphandler, form_data, post_data):
+        if("cdmode" not in post_data):
+            httphandler.send_web_response(webserver.webstatus.MISSING_DATA, "Missing request data: cdmode")
+            return
+
+        if("authkey" not in post_data):
+            log.debug("Missing request data for authentication: authkey")
+            httphandler.send_web_response(webserver.webstatus.MISSING_DATA, "Missing request data for authentication: Authentication key (authkey)")
+            return
+
+        authkey = post_data["authkey"]
+
+        user = r9x_web_providers.usermgr.get_key_owner(authkey)
+        if (user is None):
+            httphandler.send_web_response(webserver.webstatus.AUTH_FAILURE, "Invalid authentication key.")
+            return
+    
+        user.authkeys[authkey].refresh()
+
+        cdmode = post_data["cdmode"]
+
+        if(cdmode == "SCSI"):
+            main.VMM.cdrom_mode = "SCSI"
+            httphandler.send_web_response(webserver.webstatus.SUCCESS, "CDRom mode set to 'SCSI'. Kill and restart the VM for the changes to take effect.")
+        elif(cdmode == "IDE"):
+            main.VMM.cdrom_mode = "IDE"
+            httphandler.send_web_response(webserver.webstatus.SUCCESS, "CDRom mode set to 'IDE'. Kill and restart the VM for the changes to take effect.")
+        else:
+            httphandler.send_web_response(webserver.webstatus.SERV_FAILURE, "Invalid cdrom mode.")
+
+            
