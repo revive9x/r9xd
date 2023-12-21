@@ -98,6 +98,7 @@ class VMManager():
                         "-netdev", "user,id=net0", "-device", "pcnet,rombar=0,netdev=net0",
                         "-drive", "id=win98,if=none,file=win98.qcow2", "-device", "scsi-hd,drive=win98",
                         "-drive", "id=iso,if=none,media=cdrom", "-device", "scsi-cd,drive=iso",
+                        "-drive", "id=floppy,if=floppy,format=raw,file=/dev/null",
                      ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # IDE CD mode
@@ -114,6 +115,7 @@ class VMManager():
                         "-netdev", "user,id=net0", "-device", "pcnet,rombar=0,netdev=net0",
                         "-drive", "id=win98,if=none,file=win98.qcow2", "-device", "scsi-hd,drive=win98",
                         "-drive", "id=iso,if=none,media=cdrom", "-device", "ide-cd,drive=iso",
+                        "-drive", "id=floppy,if=floppy,format=raw,file=/dev/null",
                      ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         not_ready = True
@@ -202,7 +204,7 @@ class VMManager():
         q.send_qmp_message({
             "execute": "blockdev-change-medium",
             "arguments": {
-                    "device": "floppy0",
+                    "device": "floppy",
                     "filename": f"floppy/{filename}"
                 }
         })
@@ -218,7 +220,7 @@ class VMManager():
 
         q.send_qmp_message({
                 "execute": "eject",
-                "device": "floppy0",
+                "device": "floppy",
                 "force": "true"
             })
         return True
